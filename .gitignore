@@ -1,0 +1,46 @@
+# ===== Go (backend) =====
+/bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+coverage.out
+coverage.html
+vendor/
+
+# ===== Env / secrets =====
+.env
+.env.*
+!.env.example
+
+# ===== Temp =====
+/tmp/
+*.log
+*.tmp
+
+# ===== Frontend (web - Vite/React) =====
+web/node_modules/
+web/dist/
+web/coverage/
+web/.vite/
+node_modules/
+*.local
+
+# ===== IDE / Editor =====
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ===== OS =====
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ===== Tooling / AI assistants =====
+.superpowers/
+.codegraph/
+.claude/

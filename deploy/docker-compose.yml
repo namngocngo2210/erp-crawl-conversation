@@ -1,0 +1,63 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: crawler
+      POSTGRES_PASSWORD: crawler
+      POSTGRES_DB: crawler
+      # Mật khẩu role chỉ-đọc chat_ro cho cầu FDW của stack desi-order. PHẢI trùng
+      # mật khẩu trong USER MAPPING của foreign server `chat_crawler` bên
+      # desi-postgres. Không dùng `:?` ở đây để `up` của stack này không chết vì
+      # thiếu biến; chính initdb/10-chat-ro.sh mới fail to khi nó rỗng.
+      CHAT_RO_PASSWORD: ${CHAT_RO_PASSWORD:-}
+    ports: ["127.0.0.1:${POSTGRES_HOST_PORT:-15432}:5432"]
+    volumes:
+      - "pgdata:/var/lib/postgresql/data"
+      # Chạy MỘT LẦN lúc cluster init trên volume rỗng — dựng lại chat_ro, thứ đã
+      # mất im lặng khi volume bị tạo lại ngày 22/09/2026. Xem đầu file script.
+      - "./initdb:/docker-entrypoint-initdb.d:ro"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crawler"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  redis:
+    image: redis:7
+    ports: ["127.0.0.1:${REDIS_HOST_PORT:-16379}:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  crawler:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    environment:
+      PANCAKE_ACCESS_TOKEN: ${PANCAKE_ACCESS_TOKEN}
+      PANCAKE_BASE_URL: ${PANCAKE_BASE_URL:-https://pages.fm/api/public_api/v1}
+      DATABASE_URL: postgres://crawler:crawler@deploy-postgres-1:5432/crawler?sslmode=disable
+      REDIS_URL: redis://redis:6379/0
+      MIGRATIONS_DIR: /db/migrations
+      CRON_SCHEDULE: "0 21 * * *"
+      CRON_TIMEZONE: Asia/Ho_Chi_Minh
+      WORKER_POOL_SIZE: "8"
+      HTTP_ADDR: ":8080"
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_TTL: ${JWT_TTL:-12h}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+    ports: ["127.0.0.1:${CRAWLER_HOST_PORT:-18080}:8080"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+  web:
+    build:
+      context: ../web
+      dockerfile: Dockerfile
+    ports: ["127.0.0.1:${WEB_HOST_PORT:-18081}:80"]
+    depends_on:
+      crawler: { condition: service_started }
+volumes:
+  pgdata:
